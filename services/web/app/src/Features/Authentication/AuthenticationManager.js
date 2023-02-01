@@ -129,6 +129,44 @@ const AuthenticationManager = {
     )
   },
 
+  //OAUTH2
+  createUserIfNotExist(oauth_user, callback) {
+    const query = {
+      email: oauth_user.email
+    };
+    User.findOne(query, (error, user) => {
+      if ((!user || !user.hashedPassword)) {
+        let pass = require("crypto").randomBytes(32).toString("hex")
+        const userRegHand = require('../User/UserRegistrationHandler.js')
+        userRegHand.registerNewUser({
+          email: query.email,
+          first_name: oauth_user.given_name,
+          last_name: oauth_user.family_name,
+          password: pass
+        }, function (error, user) {
+          if (error) {
+            return callback(error, null);
+          }
+          user.admin = false
+          user.emails[0].confirmedAt = Date.now()
+          user.save()
+          User.findOne(query, (error, user) => {
+            if (error) {
+              return callback(error, null);                 
+            }
+            if (user && user.hashedPassword) {
+              return callback(null, user);
+            } else {
+              return callback("Unknown error", null);
+            }
+          })
+        })
+      } else {
+        return callback(null, user);
+      }
+    });
+  },
+
   validateEmail(email) {
     const parsed = EmailHelper.parseEmail(email)
     if (!parsed) {

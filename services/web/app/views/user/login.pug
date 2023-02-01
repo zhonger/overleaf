@@ -11,6 +11,11 @@ block content
 						form(data-ol-async-form, name="loginForm", action='/login', method="POST")
 							input(name='_csrf', type='hidden', value=csrfToken)
 							+formMessages()
+							.form-group.text-center(style="padding-top: 10px")
+								a.btn-block.login-btn(href="/oauth/redirect" style='padding-left: 0px')
+									| Log in via IDP
+							p.login-register-hr-text-container.text-center
+								span.login-register-hr-text or
 							.form-group
 								input.form-control(
 									type='email',

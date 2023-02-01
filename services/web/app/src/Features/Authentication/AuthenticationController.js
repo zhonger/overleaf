@@ -20,6 +20,7 @@ const AsyncFormHelper = require('../Helpers/AsyncFormHelper')
 const _ = require('lodash')
 const UserAuditLogHandler = require('../User/UserAuditLogHandler')
 const AnalyticsRegistrationSourceHelper = require('../Analytics/AnalyticsRegistrationSourceHelper')
+const axios = require('axios').default
 const {
   acceptsJson,
 } = require('../../infrastructure/RequestContentTypeDetection')
@@ -295,6 +296,52 @@ const AuthenticationController = {
     }
 
     return doRequest
+  },
+
+  oauth2Redirect(req, res, next) {
+    res.redirect(`${process.env.OAUTH_AUTH_URL}?` +
+        querystring.stringify({
+          client_id: process.env.OAUTH_CLIENT_ID,
+          response_type: "code",
+          redirect_uri: (process.env.SHARELATEX_SITE_URL + "/oauth/callback"),
+        }));
+  },
+
+  oauth2Callback(req, res, next) {
+    const code = req.query.code;
+
+    axios.post(process.env.OAUTH_ACCESS_URL, {
+      grant_type: "authorization_code",
+      client_id: process.env.OAUTH_CLIENT_ID,
+      client_secret: process.env.OAUTH_CLIENT_SECRET,
+      code: code,
+      redirect_uri: (process.env.SHARELATEX_SITE_URL + "/oauth/callback")
+    }, {
+      headers: {
+        'Content-Type': "application/json",
+      }
+    }).then(access_res => {
+      data = new URLSearchParams(access_res.data)
+      authorization_bearer = "Bearer " + data.get("access_token")
+
+      axios.get(process.env.OAUTH_USER_URL, {
+        headers: {
+          'Authorization': authorization_bearer,
+        }
+      }).then(info_res => {
+        if (info_res.data.err) {
+          res.json({message: info_res.data.err});
+        } else {
+          AuthenticationManager.createUserIfNotExist(info_res.data, (error, user) => {
+            if (error) {
+              res.json({message: error});
+            } else {
+              AuthenticationController.finishLogin(user, req, res, next);
+            }
+          });
+        }
+      });
+    });
   },
 
   requireOauth() {
